@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import re
 import sys
 from pathlib import Path
 
@@ -20,7 +21,13 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 
 MARGIN = 0.08
-DPI = 100  # size in px = --size; figsize derived from it
+DPI = 100  
+BASE_ID_RE = re.compile(r"^(sample_\d+)")  
+
+
+def base_id(stem: str) -> str:
+    m = BASE_ID_RE.match(stem)
+    return m.group(1) if m else stem
 
 
 def add_auto_dimensions(doc) -> None:
@@ -112,29 +119,39 @@ def main() -> int:
                     help="also emit *_dim.png dimensioned variant")
     ap.add_argument("--no-hidden", action="store_true",
                     help="omit hidden (dashed) lines")
+    ap.add_argument("--skip-existing", action="store_true",
+                    help="skip DXFs whose output PNGs already exist")
     args = ap.parse_args()
 
     args.png_dir.mkdir(parents=True, exist_ok=True)
     dxfs = sorted(args.dxf_dir.glob("*.dxf"))
     print(f"{len(dxfs)} DXF files -> {args.png_dir} at {args.size}px")
 
-    n_ok = n_fail = 0
+    n_ok = n_fail = n_skip = 0
     for path in dxfs:
+        obj_dir = args.png_dir / base_id(path.stem)  # group views per sample
+        out_png = obj_dir / f"{path.stem}.png"
+        dim_png = obj_dir / f"{path.stem}_dim.png"
+        if (args.skip_existing and out_png.exists()
+                and (not args.with_dims or dim_png.exists())):
+            n_skip += 1
+            continue
         try:
+            obj_dir.mkdir(parents=True, exist_ok=True)
             doc = ezdxf.readfile(path)
-            render(doc, args.png_dir / f"{path.stem}.png",
+            render(doc, out_png,
                    args.size, show_hidden=not args.no_hidden)
             if args.with_dims:
                 doc_d = ezdxf.readfile(path)  # fresh copy: base stays pristine
                 add_auto_dimensions(doc_d)
-                render(doc_d, args.png_dir / f"{path.stem}_dim.png",
+                render(doc_d, dim_png,
                        args.size, show_hidden=not args.no_hidden)
             n_ok += 1
         except Exception as e:  # noqa: BLE001
             n_fail += 1
             print(f"FAIL {path.name}: {type(e).__name__}: {e}")
 
-    print(f"done: {n_ok} ok, {n_fail} failed")
+    print(f"done: {n_ok} ok, {n_fail} failed, {n_skip} skipped")
     return 0 if n_fail == 0 else 1
 
 
