@@ -117,7 +117,13 @@ class MultiViewFeatureExtractor:
             if key == 'grid_size':
                 aggregated[key] = views[0].features[key]
                 continue
-            stacked = np.stack([v.features[key] for v in views if v.features[key] is not None])
+
+            values = [v.features[key] for v in views if v.features[key] is not None]
+            if not values:
+                aggregated[key] = None
+                continue
+            stacked = np.stack(values)
+
             if self.aggregation_method == "mean":
                 aggregated[key] = np.mean(stacked, axis=0)
             elif self.aggregation_method == "max":
@@ -136,9 +142,9 @@ class MultiViewFeatureExtractor:
         obj_save_dir.mkdir(parents=True, exist_ok=True)
 
         for view in obj.views:
-            save_dict = {k: v for k, v in view.features.items()
-                         if v is not None and k != 'grid_size'}
-            np.savez_compressed(obj_save_dir / f"view_{view.view_id}_features.npz", **save_dict)
+            save_dict = {k: v.astype(np.float16) for k, v in view.features.items()
+             if v is not None and k != 'grid_size'}
+            np.savez(obj_save_dir / f"view_{view.view_id}_features.npz", **save_dict)
 
         if obj.aggregated_features is not None:
             save_dict = {k: v for k, v in obj.aggregated_features.items()
@@ -211,7 +217,7 @@ if __name__ == "__main__":
     parser.add_argument("--output", type=str, required=True, help="Output directory")
     parser.add_argument("--model-type", type=str, default="dino-v2",
                         choices=['clip', 'dino-v1', 'dino-v2', 'dino-v3',
-                                 'radio', 'siglip', 'sam', 'depth-anything'])
+                                 'radio', 'siglip', 'sam', 'sam3', 'depth-anything'])
     parser.add_argument("--model-name", type=str, default="facebook/dinov2-base",
                         help="HuggingFace model identifier")
     parser.add_argument("--num-views", type=int, default=3)
