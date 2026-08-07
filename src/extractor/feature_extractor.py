@@ -2,6 +2,8 @@ import torch
 import numpy as np
 from abc import ABC, abstractmethod
 from typing import Optional, Tuple, Dict, Union
+from sam3.model_builder import build_sam3_image_model
+from sam3.model.sam3_image_processor import Sam3Processor
 from PIL import Image
 from transformers import (
     CLIPModel, CLIPProcessor,
@@ -61,7 +63,7 @@ class BaseFeatureExtractor(ABC):
         inputs = self.preprocess(image)
         self.model = self.model.to(self.device).eval()
         
-        with torch.no_grad():
+        with torch.no_grad(), torch.autocast("cuda", dtype=torch.float16):
             outputs = self._forward(inputs)
         
         features = self._extract_features(outputs)
@@ -304,6 +306,85 @@ class SAMFeatureExtractor(BaseFeatureExtractor):
             'patch_grid': patch_grid[0].cpu().numpy(),
         }
 
+class SAM3FeatureExtractor(BaseFeatureExtractor):
+    """Extractor for SAM3 vision backbone"""
+    
+    def __init__(self, model_name: str="sam3", device: Optional[str] = None, 
+                 text_prompt: Optional[str] = None):
+        self.text_prompt = text_prompt
+        super().__init__(model_name, device)
+        
+    def _load_model(self):
+        self.model = build_sam3_image_model().to(self.device).eval()
+        self.processor = Sam3Processor(self.model)
+        
+    def preprocess(self, image: Union[str, Image.Image]) -> Dict:
+        if isinstance(image, str):
+            image = self.load_image(image)
+        return {"image": image}
+    
+    def _forward(self, inputs: Dict) -> Dict:
+        state = self.processor.set_image(inputs["image"])
+        prompt_output = None
+        if self.text_prompt is not None:
+            prompt_output = self.processor.set_text_prompt(
+                state=state, prompt=self.text_prompt
+            )
+        
+        return {"state": state, "prompt_output":prompt_output}
+
+    def _extract_features(self, outputs: Dict) -> Dict[str, np.ndarray]:
+        embed = self._get_image_embedding(outputs["state"])
+        C, H, W = embed.shape
+        
+        patch_grid = embed.permute(1, 2, 0)
+        patch_tokens = patch_grid.reshape(H * W, C)
+        
+        features = {
+            "cls_token": None,
+            "patch_tokens": patch_tokens.float().cpu().numpy(),
+            "patch_grid": patch_grid.float().cpu().numpy(),
+        }
+        
+        if outputs["prompt_output"] is not None: 
+            pooled = self._masked_pool(outpus["prompt_output"], embed, H, W)
+            if pooled is not None:
+                features["object_feature"] = pooled 
+        
+        return features
+    
+    def _get_image_embedding(self, state):
+        """Locate the backbone embedding in the inference state"""
+        candidates = ("image_embed", "vision_feats", "backbone_out", "image_embeddings")
+        container = state if isinstance(state, dict) else vars(state)
+        for key in candidates:
+            if key in container and container[key] is not None:
+                t = container[key]
+                if isinstance(t, dict):
+                    t = next(iter(t.values()))
+                if isinstance(t, (list, tuple)):
+                    t = t[-1]
+                return t.squeeze(0) # (C,H,W)
+        
+    
+    def _masked_pool(self, output, embed, H, W):
+        masks, scores = output["masks"], output["scores"]
+        if len(scores) == 0:
+            print(f"Warning: no mask for prompt")
+            return None
+        best = torch.as_tensor(
+            masks[int(torch.as_tensor(scores).argmax())],
+            device=embed.device, dtype=torch.float32,
+        )        
+        
+        mask_lr = torch.nn.functional.interpolate(
+            best[None, None], size=(H,W), mode="bilinear", align_corners=False)[0,0]
+        
+        w = mask_lr.reshape(-1,1)
+        if w.sum() < 1e-6:
+            return None
+        flat = embed.permute(1, 2, 0).reshape(-1, embed.shape[0])
+        return ((flat * w).sum(0) / w.sum()).float().cpu().numpy()
 
 # ==================== Depth Anything ====================
 
@@ -366,6 +447,7 @@ class FeatureExtractorFactory:
         'radio': RadioFeatureExtractor,
         'siglip': SigLIPFeatureExtractor,
         'sam': SAMFeatureExtractor,
+        'sam3': SAM3FeatureExtractor,
         'depth-anything': DepthAnythingFeatureExtractor,
     }
     
@@ -384,30 +466,3 @@ class FeatureExtractorFactory:
             raise ValueError(f"Unknown model type '{model_type}'. "
                            f"Available: {list(cls._registry.keys())}")
         return cls._registry[model_type](model_name, device)
-
-
-# ==================== Usage Example ====================
-
-if __name__ == "__main__":
-    image_path = "/content/5da360c98b9af0ad709fe18606992229.jpg"
-    
-    # --- Method 1: Direct instantiation ---
-    extractor = CLIPFeatureExtractor("openai/clip-vit-base-patch16")
-    features = extractor.extract(image_path)
-    print(f"CLS shape: {features['cls_token'].shape}")
-    print(f"Patch grid shape: {features['patch_grid'].shape}")
-    
-    # --- Method 2: Factory ---
-    configs = [
-        ('clip', 'openai/clip-vit-base-patch16'),
-        ('dino-v2', 'facebook/dinov2-base'),
-        ('sam', 'facebook/sam-vit-base'),
-    ]
-    
-    for model_type, model_name in configs:
-        print(f"\n--- {model_type}: {model_name} ---")
-        ext = FeatureExtractorFactory.create(model_type, model_name)
-        feats = ext.extract(image_path)
-        print(f"  CLS: {feats['cls_token'].shape if feats['cls_token'] is not None else None}")
-        print(f"  Patches: {feats['patch_tokens'].shape}")
-        print(f"  Grid: {feats['grid_size']}")
