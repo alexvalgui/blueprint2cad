@@ -433,6 +433,75 @@ class DepthAnythingFeatureExtractor(BaseFeatureExtractor):
             'patch_grid': patch_grid[0].cpu().numpy(),
         }
 
+# ==================== TIPSv2 ====================
+class TipsV2FeatureExtractor(BaseFeatureExtractor):
+    """Extractor for Google TIPSv2 models (e.g. google/tipsv2-b14).
+
+    TIPSv2 doesn't ship a HF `Processor`/`ImageProcessor` — it just expects
+    images resized to a fixed square resolution and scaled to [0, 1], with
+    NO ImageNet mean/std normalization. Features are pulled via the model's
+    own `encode_image` method rather than a generic forward pass, so
+    `preprocess`, `_forward`, and `_extract_features` are all overridden
+    relative to the CLIP-style flow.
+    """
+
+    def __init__(
+        self,
+        model_name: str = "google/tipsv2-b14",
+        device: Optional[str] = None,
+        image_size: int = 448,
+        patch_size: int = 14,
+    ):
+        self.image_size = image_size
+        self.patch_size = patch_size
+        super().__init__(model_name, device)
+
+    def _load_model(self):
+        self.model = AutoModel.from_pretrained(
+            self.model_name,
+            trust_remote_code=True,
+        ).to(self.device)
+
+        # No HF processor for TIPSv2 — build the equivalent torchvision
+        # transform ourselves. NOTE: ToTensor() only (no Normalize) —
+        # TIPSv2 expects raw [0, 1] pixel values.
+        self.processor = transforms.Compose([
+            transforms.Resize((self.image_size, self.image_size)),
+            transforms.ToTensor(),
+        ])
+
+    def preprocess(self, image: Union[str, Image.Image]) -> Dict:
+        """Preprocess image into model inputs (overridden: no HF processor)."""
+        if isinstance(image, str):
+            image = self.load_image(image)
+        pixel_values = self.processor(image).unsqueeze(0)  # (1, 3, H, W)
+        return {"pixel_values": pixel_values.to(self.device)}
+
+    def _forward(self, inputs: Dict):
+        # TIPSv2 exposes a dedicated encode_image method rather than a
+        # generic __call__/forward taking **inputs.
+        return self.model.encode_image(inputs["pixel_values"])
+
+    def _extract_features(self, outputs) -> Dict[str, np.ndarray]:
+        # outputs.cls_token:    (1, 1, D)
+        # outputs.patch_tokens: (1, N, D)   where N = (image_size / patch_size) ** 2
+        cls_token = outputs.cls_token[:, 0, :]  # (1, D)
+        cls_embedding = torch.nn.functional.normalize(cls_token, p=2, dim=-1)
+
+        patch_tokens = outputs.patch_tokens  # (1, N, D)
+        B, N, D = patch_tokens.shape
+        grid_size = int(round(N ** 0.5))
+        assert grid_size * grid_size == N, (
+            f"Non-square patch grid: N={N} doesn't factor into a square"
+        )
+
+        patch_grid = patch_tokens.reshape(B, grid_size, grid_size, D)
+
+        return {
+            'cls_token': cls_embedding[0].cpu().numpy(),      # (D,)
+            'patch_tokens': patch_tokens[0].cpu().numpy(),    # (N, D)
+            'patch_grid': patch_grid[0].cpu().numpy(),        # (H, W, D)
+        }
 
 # ==================== Factory ====================
 
@@ -449,6 +518,7 @@ class FeatureExtractorFactory:
         'sam': SAMFeatureExtractor,
         'sam3': SAM3FeatureExtractor,
         'depth-anything': DepthAnythingFeatureExtractor,
+        'tips2': TipsV2FeatureExtractor,
     }
     
     @classmethod
