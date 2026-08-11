@@ -8,6 +8,7 @@ from typing import List, Dict, Optional, Union
 from dataclasses import dataclass
 import numpy as np
 from tqdm import tqdm
+from transformers import AutoModel, CLIPImageProcessor
 
 from feature_extractor import BaseFeatureExtractor, FeatureExtractorFactory
 

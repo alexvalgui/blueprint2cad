@@ -10,6 +10,7 @@ from transformers import (
     AutoModel, AutoImageProcessor,
     SamModel, SamProcessor,
     DepthAnythingForDepthEstimation,
+    CLIPImageProcessor,
 )
 
 
