@@ -1,7 +1,7 @@
 import numpy as np
 from pathlib import Path
 
-RESULTS = Path("/home/ec2-user/cad-2d-vision-foundational/results/clip")
+RESULTS = Path("/home/ec2-user/cad-2d-vision-foundational/results/sam3")
 DRAWING_SUBDIR = "normal"
 RENDER_SUBDIR = "2d_embeds"
 CHUNK = 256
@@ -109,10 +109,10 @@ if RUN["1A"]:
 
     r1b_d2r = evaluate(
         ranks_from_similarity(sim_1b_d2r, N),
-        "1B multi-view max-pooled similarity: drawing -> render", N)
+        "1A multi-view max-pooled similarity: drawing -> render", N)
     r1b_r2d = evaluate(
         ranks_from_similarity(sim_1b_r2d, N),
-        "1B multi-view max-pooled similarity: render -> drawing", N)
+        "1A multi-view max-pooled similarity: render -> drawing", N)
 
 # ---- Variant 1B: mean-pooled embeddings ----
 if RUN["1B"]:
@@ -162,16 +162,16 @@ if RUN["1C"]:
 
     r1d_mean_d2r = evaluate(
         ranks_from_similarity(sim_1d_d2r_mean, N),
-        "1D view-aligned MEAN over views: drawing -> render", N)
+        "1C view-aligned MEAN over views: drawing -> render", N)
     r1d_mean_r2d = evaluate(
         ranks_from_similarity(sim_1d_r2d_mean, N),
-        "1D view-aligned MEAN over views: render -> drawing", N)
+        "1C view-aligned MEAN over views: render -> drawing", N)
     r1d_max_d2r = evaluate(
         ranks_from_similarity(sim_1d_d2r_max, N),
-        "1D view-aligned MAX over views: drawing -> render", N)
+        "1C view-aligned MAX over views: drawing -> render", N)
     r1d_max_r2d = evaluate(
         ranks_from_similarity(sim_1d_r2d_max, N),
-        "1D view-aligned MAX over views: render -> drawing", N)
+        "1C view-aligned MAX over views: render -> drawing", N)
 
 # ---- Save whatever ran ----
 out = {"samples": np.array(samples)}
