@@ -1,14 +1,13 @@
 import numpy as np
 from pathlib import Path
 
-RESULTS = Path("/home/ec2-user/cad-2d-vision-foundational/results/dinov3")
+RESULTS = Path("/home/ec2-user/cad-2d-vision-foundational/results/clip")
 DRAWING_SUBDIR = "normal"
 RENDER_SUBDIR = "2d_embeds"
-SINGLE_VIEW_ID = 1
 CHUNK = 256
 OUT_PREFIX = RESULTS.name
 
-RUN = {"1A": False, "1B": False, "1C": False, "1D": True}
+RUN = {"1A": True, "1B": True, "1C": True}
 
 
 def load_embedding(npz_path):
@@ -90,24 +89,9 @@ def ranks_from_similarity(sim_fn, n_query):
     return ranks
 
 
-# ---- Variant 1A: single view each side ----
+
+# ---- Variant 1A: max similarity over all view pairs ----
 if RUN["1A"]:
-    D1 = Dv[:, SINGLE_VIEW_ID - 1]
-    R1 = Rv[:, SINGLE_VIEW_ID - 1]
-
-    def sim_1a_d2r(s, e): return D1[s:e] @ R1.T
-    def sim_1a_r2d(s, e): return R1[s:e] @ D1.T
-
-    view_name = DRAWING_VIEW_NAMES[SINGLE_VIEW_ID - 1]
-    r1a_d2r = evaluate(
-        ranks_from_similarity(sim_1a_d2r, N),
-        f"1A single view [{view_name}]: drawing -> render", N)
-    r1a_r2d = evaluate(
-        ranks_from_similarity(sim_1a_r2d, N),
-        f"1A single view [{view_name}]: render -> drawing", N)
-
-# ---- Variant 1B: max similarity over all view pairs ----
-if RUN["1B"]:
     Rflat = Rv.reshape(N * Vr, -1)
     Dflat = Dv.reshape(N * Vd, -1)
 
@@ -130,8 +114,8 @@ if RUN["1B"]:
         ranks_from_similarity(sim_1b_r2d, N),
         "1B multi-view max-pooled similarity: render -> drawing", N)
 
-# ---- Variant 1C: mean-pooled embeddings ----
-if RUN["1C"]:
+# ---- Variant 1B: mean-pooled embeddings ----
+if RUN["1B"]:
     Dm = Dv.mean(axis=1)
     Dm = Dm / np.linalg.norm(Dm, axis=1, keepdims=True)
     Rm = Rv.mean(axis=1)
@@ -147,8 +131,8 @@ if RUN["1C"]:
         ranks_from_similarity(sim_1c_r2d, N),
         "1C mean-pooled embeddings: render -> drawing", N)
 
-# ---- Variant 1D: view-aligned matching (view i vs view i only) ----
-if RUN["1D"]:
+# ---- Variant 1C: view-aligned matching (view i vs view i only) ----
+if RUN["1C"]:
     Rv_t = [Rv[:, v, :].T.copy() for v in range(Vr)]
     Dv_t = [Dv[:, v, :].T.copy() for v in range(Vd)]
 
@@ -196,10 +180,9 @@ if RUN["1A"]:
 if RUN["1B"]:
     out.update(r1b_d2r=r1b_d2r, r1b_r2d=r1b_r2d)
 if RUN["1C"]:
-    out.update(r1c_d2r=r1c_d2r, r1c_r2d=r1c_r2d)
-if RUN["1D"]:
     out.update(r1d_mean_d2r=r1d_mean_d2r, r1d_mean_r2d=r1d_mean_r2d,
                r1d_max_d2r=r1d_max_d2r, r1d_max_r2d=r1d_max_r2d)
+    
 
 tag = "".join(k for k, v in RUN.items() if v)
 outfile = f"{OUT_PREFIX}_exp1_{tag}_results.npz"

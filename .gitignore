@@ -1,3 +1,5 @@
 results/
 results/
-analysis/dinov3_views_cache.npzsrc/analysis/dinov3_views_cache.npz
+analysis/dinov3_views_cache.npz
+src/analysis/dinov3_views_cache.npz
+src/analysis/dinov3_exp1_1D_results.npz
