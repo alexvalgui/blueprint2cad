@@ -1,5 +1,8 @@
 results/
-results/
+src/geometry/results.csv
 analysis/dinov3_views_cache.npz
 src/analysis/dinov3_views_cache.npz
 src/analysis/dinov3_exp1_1D_results.npz
+src/geometry/results.csv
+src/analysis/*.npz
+src/analysis/*.log

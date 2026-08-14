@@ -5,9 +5,10 @@ from typing import Optional, Tuple, Dict, Union
 from sam3.model_builder import build_sam3_image_model
 from sam3.model.sam3_image_processor import Sam3Processor
 from PIL import Image
+from torchvision import transforms
 from transformers import (
     CLIPModel, CLIPProcessor,
-    AutoModel, AutoImageProcessor,
+    AutoModel, AutoImageProcessor, AutoProcessor,
     SamModel, SamProcessor,
     DepthAnythingForDepthEstimation,
     CLIPImageProcessor,
@@ -242,32 +243,83 @@ class RadioFeatureExtractor(BaseFeatureExtractor):
             'patch_grid': patch_grid[0].cpu().numpy(),
         }
 
+# ==================== SigLIP 2 ====================
 
-# ==================== SigLIP ====================
+class SigLIP2FeatureExtractor(BaseFeatureExtractor):
+    """Extractor for SigLIP 2 models (e.g. google/siglip2-base-patch16-224).
 
-class SigLIPFeatureExtractor(BaseFeatureExtractor):
-    """Extractor for SigLIP models."""
-    
+    Same output shape as SigLIP 1: `vision_model` returns a pure spatial
+    `last_hidden_state` (no CLS token) plus a `pooler_output` global
+    embedding. NOTE: this assumes a fixed-resolution SigLIP 2 checkpoint —
+    the variable-resolution "NaFlex" checkpoints return ragged patch grids
+    (with a separate `spatial_shapes`/`pixel_attention_mask`) and are NOT
+    handled by this class.
+    """
+
     def _load_model(self):
         self.model = AutoModel.from_pretrained(self.model_name).to(self.device)
         self.processor = AutoProcessor.from_pretrained(self.model_name)
-    
+
     def _forward(self, inputs: Dict):
         return self.model.vision_model(**inputs)
-    
+
     def _extract_features(self, outputs) -> Dict[str, np.ndarray]:
         # Global pooled representation
         cls_token = outputs.pooler_output  # [B, D]
-        
-        # SigLIP last_hidden_state has NO CLS token — all are spatial patches
+
+        # SigLIP2 last_hidden_state has NO CLS token — all are spatial patches
+        patch_tokens = outputs.last_hidden_state  # [B, N, D]
+        B, N, D = patch_tokens.shape
+        grid_size = int(round(N ** 0.5))
+        assert grid_size * grid_size == N, (
+            f"Non-square patch grid: N={N} doesn't factor into a square "
+            f"(are you using a NaFlex/variable-resolution checkpoint?)"
+        )
+
+        patch_grid = patch_tokens.reshape(B, grid_size, grid_size, D)
+
+        return {
+            'cls_token': cls_token[0].cpu().numpy(),
+            'patch_tokens': patch_tokens[0].cpu().numpy(),
+            'patch_grid': patch_grid[0].cpu().numpy(),
+        }
+
+
+# ==================== I-JEPA ====================
+
+class IJEPAFeatureExtractor(BaseFeatureExtractor):
+    """Extractor for I-JEPA models (facebook/ijepa_vitg16_22k, etc.).
+
+    I-JEPA's ViT has no class token — `last_hidden_state` is pure spatial
+    patch tokens. There's no reliable global-pooled output analogous to a
+    CLS embedding, so (matching the official usage example) we take the
+    mean over patch tokens as the 'cls_token' summary embedding.
+    """
+
+    def _load_model(self):
+        self.model = AutoModel.from_pretrained(self.model_name).to(self.device)
+        self.processor = AutoProcessor.from_pretrained(self.model_name)
+
+    def _forward(self, inputs: Dict):
+        return self.model(**inputs)
+
+    def _extract_features(self, outputs) -> Dict[str, np.ndarray]:
+        # No CLS token in I-JEPA — last_hidden_state is all spatial patches.
         patch_tokens = outputs.last_hidden_state  # [B, N, D]
         B, N, D = patch_tokens.shape
         grid_size = int(N ** 0.5)
-        
+        assert grid_size * grid_size == N, (
+            f"Non-square patch grid: N={N} doesn't factor into a square"
+        )
+
         patch_grid = patch_tokens.reshape(B, grid_size, grid_size, D)
-        
+
+        cls_embedding = torch.nn.functional.normalize(
+            patch_tokens.mean(dim=1), p=2, dim=-1
+        )  # [B, D] — mean-pooled summary, no true CLS token exists
+
         return {
-            'cls_token': cls_token[0].cpu().numpy(),
+            'cls_token': cls_embedding[0].cpu().numpy(),
             'patch_tokens': patch_tokens[0].cpu().numpy(),
             'patch_grid': patch_grid[0].cpu().numpy(),
         }
@@ -515,11 +567,12 @@ class FeatureExtractorFactory:
         'dino-v2': DinoV2FeatureExtractor,
         'dino-v3': DinoV3FeatureExtractor,
         'radio': RadioFeatureExtractor,
-        'siglip': SigLIPFeatureExtractor,
+        'siglip2': SigLIP2FeatureExtractor,
+        'i-jepa': IJEPAFeatureExtractor,
         'sam': SAMFeatureExtractor,
         'sam3': SAM3FeatureExtractor,
         'depth-anything': DepthAnythingFeatureExtractor,
-        'tips2': TipsV2FeatureExtractor,
+        'tips-v2': TipsV2FeatureExtractor,
     }
     
     @classmethod
