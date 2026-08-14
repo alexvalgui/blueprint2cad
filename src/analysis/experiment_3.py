@@ -21,7 +21,7 @@ from datetime import datetime
 import numpy as np
 from pathlib import Path
 
-RESULTS = Path("/home/ec2-user/cad-2d-vision-foundational/results/clip")
+RESULTS = Path("/home/ec2-user/cad-2d-vision-foundational/results/ijepa")
 RENDER_SUBDIR = "2d_embeds"
 VARIANTS = ["normal", "dim"]
 CHUNK = 256
@@ -29,6 +29,8 @@ OUT_PREFIX = RESULTS.name
 
 PERM = [3, 5, 2, 0, 1, 4]
 VIEW_NAMES = ["back", "bottom", "front", "left", "right", "top"]
+
+RECALL_KS = [1, 2, 3, 5, 10]
 
 
 class Tee:
@@ -46,7 +48,7 @@ class Tee:
         self.log.flush()
 
 
-LOGFILE = f"{OUT_PREFIX}_exp4_{datetime.now():%Y%m%d_%H%M}.log"
+LOGFILE = f"{OUT_PREFIX}_exp3_{datetime.now():%Y%m%d_%H%M}.log"
 sys.stdout = Tee(LOGFILE)
 sys.stderr = sys.stdout
 print(f"Logging to {LOGFILE}")
@@ -129,7 +131,7 @@ Rv_t = [Rv[:, v, :].T.copy() for v in range(Rv.shape[1])]
 
 def evaluate(ranks, name, n_gallery):
     print(f"\n=== {name} ===")
-    for k in (1, 5, 10):
+    for k in RECALL_KS:
         print(f"Recall@{k:<3}: {(ranks < k).mean() * 100:6.2f}")
     print(f"MRR        : {(1.0 / (ranks + 1)).mean():.4f}")
     print(f"Median rank: {np.median(ranks):.0f} / {n_gallery}   "

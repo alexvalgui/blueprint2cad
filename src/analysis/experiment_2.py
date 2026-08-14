@@ -12,14 +12,38 @@ projection). Evaluates:
       views added in descending single-view performance order
 """
 
+import sys
+from datetime import datetime
+
 import numpy as np
 from pathlib import Path
 
-RESULTS = Path("/home/ec2-user/cad-2d-vision-foundational/results/sam3")
+RESULTS = Path("/home/ec2-user/cad-2d-vision-foundational/results/ijepa")
 DRAWING_SUBDIR = "normal"
 RENDER_SUBDIR = "2d_embeds"
 CHUNK = 256
 OUT_PREFIX = RESULTS.name
+
+
+class Tee:
+    def __init__(self, logfile):
+        self.terminal = sys.stdout
+        self.log = open(logfile, "w")
+
+    def write(self, msg):
+        self.terminal.write(msg)
+        self.log.write(msg)
+        self.log.flush()
+
+    def flush(self):
+        self.terminal.flush()
+        self.log.flush()
+
+
+LOGFILE = f"{OUT_PREFIX}_exp2_{datetime.now():%Y%m%d_%H%M}.log"
+sys.stdout = Tee(LOGFILE)
+sys.stderr = sys.stdout
+print(f"Logging to {LOGFILE}")
 
 # Drawing views load alphabetically; PERM maps each drawing view index to the
 # render index depicting the same projection (see experiment_1.py).
@@ -86,18 +110,17 @@ Rv = Rv / np.linalg.norm(Rv, axis=2, keepdims=True)
 Rv = Rv[:, PERM]      # render view i now depicts the same projection as drawing view i
 
 
+RECALL_KS = [1, 2, 3, 5, 10]
+
+
 def evaluate(ranks, name, n_gallery, quiet=False):
-    metrics = {
-        "R@1": (ranks < 1).mean() * 100,
-        "R@5": (ranks < 5).mean() * 100,
-        "R@10": (ranks < 10).mean() * 100,
-        "MRR": (1.0 / (ranks + 1)).mean(),
-        "MedRank": float(np.median(ranks)),
-    }
+    metrics = {f"R@{k}": (ranks < k).mean() * 100 for k in RECALL_KS}
+    metrics["MRR"] = (1.0 / (ranks + 1)).mean()
+    metrics["MedRank"] = float(np.median(ranks))
     if not quiet:
         print(f"\n=== {name} ===")
-        print(f"R@1: {metrics['R@1']:6.2f}  R@5: {metrics['R@5']:6.2f}  "
-              f"R@10: {metrics['R@10']:6.2f}  MRR: {metrics['MRR']:.4f}  "
+        recall_str = "  ".join(f"R@{k}: {metrics[f'R@{k}']:6.2f}" for k in RECALL_KS)
+        print(f"{recall_str}  MRR: {metrics['MRR']:.4f}  "
               f"MedRank: {metrics['MedRank']:.0f} / {n_gallery}")
     return metrics
 

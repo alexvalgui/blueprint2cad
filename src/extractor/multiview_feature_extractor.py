@@ -218,7 +218,8 @@ if __name__ == "__main__":
     parser.add_argument("--output", type=str, required=True, help="Output directory")
     parser.add_argument("--model-type", type=str, default="dino-v2",
                         choices=['clip', 'dino-v1', 'dino-v2', 'dino-v3',
-                                 'radio', 'siglip', 'sam', 'sam3', 'depth-anything'])
+                                'radio', 'siglip', 'siglip2', 'i-jepa', 'sam', 'sam3',
+                                'depth-anything', 'tips-v2'])
     parser.add_argument("--model-name", type=str, default="facebook/dinov2-base",
                         help="HuggingFace model identifier")
     parser.add_argument("--num-views", type=int, default=3)

@@ -1,7 +1,9 @@
 import numpy as np
 from pathlib import Path
+from concurrent.futures import ThreadPoolExecutor
+import os
 
-RESULTS = Path("/home/ec2-user/cad-2d-vision-foundational/results/sam3")
+RESULTS = Path("/home/ec2-user/cad-2d-vision-foundational/results/ijepa")
 DRAWING_SUBDIR = "normal"
 RENDER_SUBDIR = "2d_embeds"
 CHUNK = 256
@@ -9,11 +11,12 @@ OUT_PREFIX = RESULTS.name
 
 RUN = {"1A": True, "1B": True, "1C": True}
 
+RECALL_KS = [1, 2, 3, 5, 10]
+
 
 def load_embedding(npz_path):
-    d = np.load(npz_path)
-    key = list(d.keys())[0]
-    v = d[key].squeeze().astype(np.float32)
+    with np.load(npz_path) as d:
+        v = d[d.files[0]].squeeze().astype(np.float32)
     return v.mean(axis=0) if v.ndim > 1 else v
 
 
@@ -21,6 +24,16 @@ def load_views(folder):
     files = sorted(folder.glob("view_*_features.npz"),
                    key=lambda p: int(p.stem.split("_")[1]))
     return [load_embedding(f) for f in files]
+
+
+def load_sample(sample_dir):
+    if not sample_dir.is_dir():
+        return None
+    dv = load_views(sample_dir / DRAWING_SUBDIR)
+    rv = load_views(sample_dir / RENDER_SUBDIR)
+    if not dv or not rv:
+        return None
+    return sample_dir.name, np.stack(dv), np.stack(rv)
 
 
 cache = Path(f"{OUT_PREFIX}_views_cache.npz")
@@ -33,22 +46,23 @@ if cache.exists():
     print(f"Loaded cache {cache}: {N} samples | {Vd} drawing views, "
           f"{Vr} render views, dim = {Dv.shape[2]}")
 else:
+    sample_dirs = sorted(RESULTS.iterdir())
+    with ThreadPoolExecutor(max_workers=os.cpu_count() * 2) as ex:
+        results = list(ex.map(load_sample, sample_dirs))
+
     samples, draw_views, rend_views = [], [], []
     n_dv, n_rv = None, None
-    for sample_dir in sorted(RESULTS.iterdir()):
-        if not sample_dir.is_dir():
+    for r in results:
+        if r is None:
             continue
-        dv = load_views(sample_dir / DRAWING_SUBDIR)
-        rv = load_views(sample_dir / RENDER_SUBDIR)
-        if not dv or not rv:
-            continue
+        name, dv, rv = r
         if n_dv is None:
-            n_dv, n_rv = len(dv), len(rv)
-        if len(dv) != n_dv or len(rv) != n_rv:
+            n_dv, n_rv = dv.shape[0], rv.shape[0]
+        if dv.shape[0] != n_dv or rv.shape[0] != n_rv:
             continue
-        samples.append(sample_dir.name)
-        draw_views.append(np.stack(dv))
-        rend_views.append(np.stack(rv))
+        samples.append(name)
+        draw_views.append(dv)
+        rend_views.append(rv)
 
     Dv = np.stack(draw_views)   # (N, Vd, dim)
     Rv = np.stack(rend_views)   # (N, Vr, dim)
@@ -70,7 +84,7 @@ DRAWING_VIEW_NAMES = ["back", "bottom", "front", "left", "right", "top"]
 
 def evaluate(ranks, name, n_gallery):
     print(f"\n=== {name} ===")
-    for k in (1, 5, 10, 100):
+    for k in RECALL_KS:
         print(f"Recall@{k:<3}: {(ranks < k).mean():.4f}")
     print(f"MRR        : {(1.0 / (ranks + 1)).mean():.4f}")
     print(f"Mean rank  : {ranks.mean():.1f} / {n_gallery}")
@@ -107,10 +121,10 @@ if RUN["1A"]:
         S = S.reshape(e - s, Vr, N, Vd)
         return S.max(axis=(1, 3))
 
-    r1b_d2r = evaluate(
+    r1a_d2r = evaluate(
         ranks_from_similarity(sim_1b_d2r, N),
         "1A multi-view max-pooled similarity: drawing -> render", N)
-    r1b_r2d = evaluate(
+    r1a_r2d = evaluate(
         ranks_from_similarity(sim_1b_r2d, N),
         "1A multi-view max-pooled similarity: render -> drawing", N)
 
@@ -124,12 +138,12 @@ if RUN["1B"]:
     def sim_1c_d2r(s, e): return Dm[s:e] @ Rm.T
     def sim_1c_r2d(s, e): return Rm[s:e] @ Dm.T
 
-    r1c_d2r = evaluate(
+    r1b_d2r = evaluate(
         ranks_from_similarity(sim_1c_d2r, N),
-        "1C mean-pooled embeddings: drawing -> render", N)
-    r1c_r2d = evaluate(
+        "1B mean-pooled embeddings: drawing -> render", N)
+    r1b_r2d = evaluate(
         ranks_from_similarity(sim_1c_r2d, N),
-        "1C mean-pooled embeddings: render -> drawing", N)
+        "1B mean-pooled embeddings: render -> drawing", N)
 
 # ---- Variant 1C: view-aligned matching (view i vs view i only) ----
 if RUN["1C"]:
@@ -182,7 +196,7 @@ if RUN["1B"]:
 if RUN["1C"]:
     out.update(r1d_mean_d2r=r1d_mean_d2r, r1d_mean_r2d=r1d_mean_r2d,
                r1d_max_d2r=r1d_max_d2r, r1d_max_r2d=r1d_max_r2d)
-    
+
 
 tag = "".join(k for k, v in RUN.items() if v)
 outfile = f"{OUT_PREFIX}_exp1_{tag}_results.npz"

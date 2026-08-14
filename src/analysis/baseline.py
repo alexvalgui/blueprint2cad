@@ -5,7 +5,7 @@ from sklearn.metrics import (adjusted_rand_score,
                              normalized_mutual_info_score,
                              silhouette_score)
 
-RESULTS = Path("/home/ec2-user/cad-2d-vision-foundational/results/sam3")
+RESULTS = Path("/home/ec2-user/cad-2d-vision-foundational/results/radio")
 DRAWING_SUBDIR = "normal"
 
 def load_embedding(npz_path):
@@ -18,7 +18,7 @@ samples, draw_embs, rend_embs = [], [], []
 for sample_dir in sorted(RESULTS.iterdir()):
     if not sample_dir.is_dir():
         continue
-    rend_f = sample_dir / "2d_embeds" / "aggregated_features.npz"
+    rend_f = sample_dir / "2d_dims" / "aggregated_features.npz"
     draw_f = sample_dir / DRAWING_SUBDIR / "aggregated_features.npz"
     if not (draw_f.exists() and rend_f.exists()):
         continue
