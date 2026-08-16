@@ -1,8 +1,8 @@
-results/
-src/geometry/results.csv
-analysis/dinov3_views_cache.npz
-src/analysis/dinov3_views_cache.npz
-src/analysis/dinov3_exp1_1D_results.npz
-src/geometry/results.csv
-src/analysis/*.npz
-src/analysis/*.log
+2d_foundational/analysis/dinov3_views_cache.npz
+2d_foundational/src/analysis/dinov3_views_cache.npz
+2d_foundational/src/analysis/dinov3_exp1_1D_results.npz
+2d_foundational/src/geometry/results.csv
+2d_foundational/src/analysis/*.npz
+2d_foundational/src/analysis/*.log
+vlms/data
+results.xlsx
