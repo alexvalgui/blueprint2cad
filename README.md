@@ -22,7 +22,7 @@ Marcos V. Conde<sup>3</sup>
 <p align="center">
   <a href="https://alexvalgui.github.io/blueprint2cad/paper.pdf"><img src="https://img.shields.io/badge/Paper-PDF-b31b1b?style=flat-square" alt="Paper (PDF)"></a>
   <a href="https://huggingface.co/datasets/alex-novineer/blueprint2cad"><img src="https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-BlueCAD--30K-ffcc00?style=flat-square" alt="Hugging Face dataset"></a>
-  <img src="https://img.shields.io/badge/WACV%-2027-blue?style=flat-square" alt="WACV 2027 Workshops">
+  <img src="https://img.shields.io/badge/WACV-2027-blue?style=flat-square" alt="WACV 2027">
   <img src="https://img.shields.io/badge/Data-CC%20BY%204.0-2d7d46?style=flat-square" alt="CC BY 4.0">
   <img src="https://img.shields.io/badge/Code-Apache%202.0-2d7d46?style=flat-square" alt="Apache 2.0">
 </p>
