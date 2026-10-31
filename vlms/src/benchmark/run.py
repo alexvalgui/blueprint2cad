@@ -10,7 +10,6 @@ from tasks import BUILDERS
 from vlm import get_vlm
 import metrics
 
-NUMERIC_TASKS = {6, 7}
 FATAL_MARKERS = ("insufficient_quota", "credit", "model_not_supported",
                  "401", "invalid_api_key")
 
@@ -30,29 +29,25 @@ def normalize(raw, task, cot=False):
             return m.group(1).lower() if m else "UNPARSEABLE"
         m = re.search(r"\b(yes|no)\b", raw, re.I)
         return m.group(1).lower() if m else raw.lower()
-    if task in (2, 3, 5):
+    if task == 2:
         up = raw.upper()
         for pat in (r"ANSWER[:\s]*\(?([A-Y])\)?\b", r"\b([A-Y])\b(?!.*\b[A-Y]\b)"):
             m = re.search(pat, up, re.S)
             if m:
                 return m.group(1)
         return up
-    if task == 4:
+    if task == 3:
         m = re.search(r"\b(simple|complex)\b", raw, re.I)
         return m.group(1).lower() if m else raw.lower()
-    if task in (6, 7):
-        nums = re.findall(r"-?\d+\.?\d*", raw)
-        return ",".join(nums[:2]) if nums else raw
-    m = re.search(r"-?\d+\.?\d*", raw)
-    return m.group(0) if m else raw
+    return raw
 
 
 def prepare(args):
     manifest = json.loads(Path(args.manifest).read_text())
     builder_kwargs = {"seed": args.seed}
-    if args.task == 3:
+    if args.task == 2:
         builder_kwargs["n_candidates"] = args.n_candidates
-    if args.task in (1, 3):
+    if args.task in (1, 2):
         builder_kwargs["dim"] = args.dimensioned
     items = BUILDERS[args.task](manifest, args.n_items, **builder_kwargs)
 
@@ -139,13 +134,6 @@ def run(args):
 
     if not scored:
         report = {"overall": None, "n_errors": n_errors, "n_unparseable": n_unparseable}
-    elif task in NUMERIC_TASKS:
-        report = {
-            "overall": metrics.numeric_metrics(y_true, y_pred),
-            "by_complexity": metrics.by_group(y_true, y_pred, groups,
-                                              metric_fn=metrics.numeric_metrics),
-            "n_errors": n_errors,
-        }
     else:
         labels = sorted(set(y_true))
         report = {
@@ -175,7 +163,7 @@ if __name__ == "__main__":
     sub = p.add_subparsers(dest="cmd", required=True)
 
     prep = sub.add_parser("prepare")
-    prep.add_argument("--task", type=int, required=True, choices=range(1, 8))
+    prep.add_argument("--task", type=int, required=True, choices=(1, 2, 3))
     prep.add_argument("--manifest", required=True)
     prep.add_argument("--n-items", type=int, default=500)
     prep.add_argument("--n-candidates", type=int, default=4)
