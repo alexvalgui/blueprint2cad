@@ -1,8 +1,25 @@
+# Python
+__pycache__/
+
+# 2d_foundational
 2d_foundational/analysis/dinov3_views_cache.npz
-2d_foundational/src/analysis/dinov3_views_cache.npz
-2d_foundational/src/analysis/dinov3_exp1_1D_results.npz
-2d_foundational/src/geometry/results.csv
 2d_foundational/src/analysis/*.npz
 2d_foundational/src/analysis/*.log
-vlms/data
+2d_foundational/src/geometry/results.csv
+
+# vfms
+vfms/src/extractor/pilot/
+vfms/src/extractor/out/
+vfms/src/extractor/manifests/
+vfms/src/extractor/feats/
+
+# vlms
+vlms/data/
+vlms/src/results/
+vlms/src/dataset/
+vlms/src/benchmark/runs/
+vlms/src/finetune/qwen/runs/
+
+# Data / outputs
+/BlueCAD30K/
 results.xlsx
