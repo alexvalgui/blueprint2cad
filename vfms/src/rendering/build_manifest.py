@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 
-root = Path("/home/ec2-user/research/scripts/png_out")
+root = Path("")
 manifest = {}
 
 for sample in sorted(p for p in root.iterdir() if p.is_dir()):

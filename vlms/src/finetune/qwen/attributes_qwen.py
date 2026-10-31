@@ -12,7 +12,6 @@ from transformers import AutoProcessor, Qwen3VLForConditionalGeneration
 import config_qwen as config
 
 
-# --------------------------------------------------------------------------- #
 def build_inputs(processor, drawing, render):
     msgs = [
         {"role": "system", "content": [{"type": "text", "text": config.SYSTEM_PROMPT}]},
@@ -158,7 +157,6 @@ def overlay(dmap, rmap, drawing, render, score, out_path):
     fig.tight_layout(); fig.savefig(out_path, dpi=120); plt.close(fig)
 
 
-# --------------------------------------------------------------------------- #
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--drawing"); ap.add_argument("--render")
