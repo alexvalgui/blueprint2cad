@@ -30,7 +30,7 @@ Marcos V. Conde<sup>3</sup>
 ---
 
 <p align="center">
-  <img src="figures/teaser_improved.png"
+  <img src="figures/teaser_improved.jpeg"
        alt="Overview of Blueprint2CAD. Every task pairs two 2D images, an engineering line drawing and a shaded render of a part, and asks whether they show the same part, which render matches the drawing, or whether the part is simple or complex."
        style="width: 100%; height: auto; display: block; margin: 0 auto;">
 </p>
