@@ -20,7 +20,7 @@ Marcos V. Conde<sup>3</sup>
 </p>
 
 <p align="center">
-  <a href="https://arxiv.org/abs/2611.02433"><img src="https://img.shields.io/badge/Paper-PDF-b31b1b?style=flat-square" alt="Paper (PDF)"></a>
+  <a href="https://arxiv.org/abs/2611.02433"><img src="https://img.shields.io/badge/arXiv-2611.02433-b31b1b?style=flat-square&logo=arxiv&logoColor=white" alt="arXiv 2611.02433"></a>
   <a href="https://huggingface.co/datasets/alex-novineer/blueprint2cad"><img src="https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-BlueCAD--30K-ffcc00?style=flat-square" alt="Hugging Face dataset"></a>
   <a href="https://alexvalgui.github.io/blueprint2cad/"><img src="https://img.shields.io/badge/%F0%9F%8C%90%20Website-Page-blue?style=flat-square" alt="Website"></a>
   <a href="https://chenliu-1996.github.io/LVR-WACV2027/">
